@@ -19,7 +19,7 @@ import re
 # natRule:          Name of the NAT rule ("company-outbound-overload")
 # ------------------------------------------------------------------------------------------------------
 
-# Purpose:  Perform "test nat-policy-match" determine NAT rule being used to translate
+# Purpose:  Perform "test nat-policy-match" determine NAT rule being used to translate traffic and return the name of the rule.
 # Returns:  String
 def test_natRule(apiKey, fwAddress, srcAdd, dstAdd, protocol, dstPort, toZone, toInterface):
    
@@ -52,7 +52,7 @@ def test_natRule(apiKey, fwAddress, srcAdd, dstAdd, protocol, dstPort, toZone, t
     except:
         print ("Error: Assigning NAT rule:", sys.exc_info()[0])
 
-# Purpose:  Display information of NAT rule, Translated address, interface, type.
+# Purpose:  Return information of the NAT rule including translated address, interface, type.
 # Returns   String
 def get_natRule(apiKey, fwAddress, natRule):
 
@@ -93,7 +93,7 @@ def get_natRule(apiKey, fwAddress, natRule):
     return trans_addr[0]      
    
 
-# Purpose:  Lookup egress interface from FIB for specific destination
+# Purpose:  Return name of the egress interface from FIB for specific destination.
 # Returns:  String
 def get_dstInterface(apiKey, fwAddress, virtualRouter, dstAdd):
     url = "https://" + fwAddress + "/api/"
@@ -118,7 +118,7 @@ def get_dstInterface(apiKey, fwAddress, virtualRouter, dstAdd):
         interface_name = entry.text
     return interface_name
 
-# Purpose:  Lookup egress interface from FIB for specific destination
+# Purpose:  Return the name of the zone that the toInterface is assigned to.
 # Returns:  String
 def get_interfaceZone(apiKey, fwAddress, toInterface):
 
@@ -137,7 +137,7 @@ def get_interfaceZone(apiKey, fwAddress, toInterface):
         interface_zone = entry.text
     return interface_zone
 
-# Purpose:  Returns a list of all IP addresses configured on the firewall
+# Purpose:  Returns a list of all IP addresses configured on the firewall. 
 # Returns:  List
 def list_fwAddresses(apiKey, fwAddress):
 
@@ -160,7 +160,7 @@ def list_fwAddresses(apiKey, fwAddress):
             fw_addresses.append(a[0])
     return fw_addresses
 
-# Purpose: Return the route table for specified virtual router.
+# Purpose: Return the entire route table for specified virtual router. 
 # Returns: String
 def get_vr_routeTable(apiKey, fwAddress, virtualRouter):
     url = "https://" + fwAddress + "/api"
@@ -174,7 +174,7 @@ def get_vr_routeTable(apiKey, fwAddress, virtualRouter):
     return response.text
 
 
-# Purpose:  Return bgp local rib for specified peer. 
+# Purpose:  Return the bgp local rib/prefixes sent by the specified peer. 
 # Returns:  String
 def get_bgp_locrib(apiKey, fwAddress, virtualRouter, peer):
 
@@ -189,7 +189,7 @@ def get_bgp_locrib(apiKey, fwAddress, virtualRouter, peer):
     response = requests.request("GET", url, headers=headers, params=querystring, verify=False)
     return response.text
 
-# Purpose:  Return bgp rib-out for specified peer. 
+# Purpose:  Return bgp rib-out/prefixes sent to the specified peer.  
 # Returns:  String
 def get_bgp_ribout(apiKey, fwAddress, virtualRouter, peer):
     url = "https://" + fwAddress + "/api"
