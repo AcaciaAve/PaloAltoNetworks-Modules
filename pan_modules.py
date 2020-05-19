@@ -3,69 +3,83 @@ import sys
 import xml.etree.ElementTree as ET
 import re
 
-#Perform "test nat-policy-match" determine correct NAT rule
-def test_nat_rule(fw_auth, fw_dnsname, srcadd, dstadd, protocol, dstport, tozone, tointerface):
+# ------------------------------------------------------------------------------------------------------
+# Parameter descriptions and examples
+#
+# apiKey:           apiKey generated on the firewall
+# fwAddress:        IP or DNS address of the firewall to query ("192.168.1.1" or "firewall1")
+# srcAdd:           Source ip address for the NAT test ("192.168.1.1")
+# dstAdd:           Destination ip address for the NAT ("192.168.2.1")
+# protocol:         Protocol number for the NAT test ("6")
+# dstPort:          Destination port number for the NAT test ("443")
+# toZone:           Destination zone for the NAT test ("Untrust")
+# toInterface:      Destination interface for the NAT test ("ae1.220")
+# virtualRouter:    Virtual router to use for FIB lookup ("default")
+# peer:             BGP peer name ("isp-peer-01")
+# natRule:          Name of the NAT rule ("company-outbound-overload")
+# ------------------------------------------------------------------------------------------------------
+
+# Purpose:  Perform "test nat-policy-match" determine NAT rule being used to translate
+# Returns:  String
+def test_natRule(apiKey, fwAddress, srcAdd, dstAdd, protocol, dstPort, toZone, toInterface):
    
-    url = "https://" + fw_dnsname + "/api/"
-    querystring_aws = ({"type":"op","cmd": 
+    url = "https://" + fwAddress + "/api/"
+    querystring = {"type":"op","cmd": 
     "<test>" 
     "<nat-policy-match>" 
-    "<source>" + srcadd + "</source>" 
-    "<destination>" + dstadd + "</destination>" 
+    "<source>" + srcAdd + "</source>" 
+    "<destination>" + dstAdd + "</destination>"
     "<protocol>" + protocol + "</protocol>" 
-    "<destination-port>" + dstport + "</destination-port>" 
-    "<to>" + tozone + "</to>" 
-    "<to-interface>" + tointerface + "</to-interface>"
+    "<destination-port>" + dstPort + "</destination-port>" 
+    "<to>" + toZone + "</to>" 
+    "<to-interface>" + toInterface + "</to-interface>"
     "</nat-policy-match>" 
-    "</test>"
-    ,"key":fw_auth
-    })
+    "</test>","key":apiKey
+    }
 
     headers = {
-    'cache-control': "no-cache",
+    'cache-control':"no-cache",
     }
     
-    resp = requests.request("POST", url, headers=headers, params=querystring_aws, verify=False)      
+    response = requests.request("GET", url, headers=headers, params=querystring, verify=False)      
 
     try:
-        root = ET.fromstring(resp.text)
+        root = ET.fromstring(response.text)
 
         for entry in root.iter('entry'):
-            nat_rule = entry.text
-
+            natRule = entry.text
+        return natRule
     except:
         print ("Error: Assigning NAT rule:", sys.exc_info()[0])
 
-    return nat_rule
+# Purpose:  Display information of NAT rule, Translated address, interface, type.
+# Returns   String
+def get_natRule(apiKey, fwAddress, natRule):
 
-#Perform lookup information lookup of specific NAT rule
-def get_nat_rule(fw_auth, fw_dnsname, nat_rule):
-
-    url = "https://" + fw_dnsname + "/api/"
-    querystring = ({"type":"op","cmd": 
+    url = "https://" + fwAddress + "/api/"
+    querystring = {"type":"op","cmd": 
     "<show>"
     "<running>" 
     "<nat-policy>" 
     "</nat-policy>"
     "</running>" 
-    "</show>" 
-    ,"key":fw_auth
-    })
+    "</show>","key":apiKey
+    }
 
     headers = {
-    'cache-control': "no-cache",
+    'cache-control':"no-cache",
     }
-    
-    resp = requests.request("POST", url, headers=headers, params=querystring, verify=False)
-    root = ET.fromstring(resp.text)
-    all_nat_policies = re.split('\n',resp.text)
+
+    response = requests.request("GET", url, headers=headers, params=querystring, verify=False)
+    root = ET.fromstring(response.text)
+    all_nat_policies = re.split('\n',response.text)
     all_nat_policies = [x.strip(' ').strip('"') for x in all_nat_policies]
         
     for i in all_nat_policies:
-        if re.search(nat_rule,i):
-            nat_rule_index = all_nat_policies.index(i)
+        if re.search(natRule,i):
+            natRule_index = all_nat_policies.index(i)
 
-    for i in all_nat_policies[nat_rule_index:]:
+    for i in all_nat_policies[natRule_index:]:
         if i.startswith('translate-to '):
             if re.search(r'translate-to .*?\)',i) != None:
                 trans_addr = re.search(r'translate-to .*?\)',i)
@@ -76,109 +90,115 @@ def get_nat_rule(fw_auth, fw_dnsname, nat_rule):
             else:
                 trans_addr = ("Error retrieving address translation")
                 break
-    return trans_addr        
+    return trans_addr[0]      
    
 
-def get_dst_interface(fw_auth, fw_dnsname, virtual_router, dstadd):
-
-    url = "https://" + fw_dnsname + "/api/"
-    querystring = ({"type":"op","cmd": 
+# Purpose:  Lookup egress interface from FIB for specific destination
+# Returns:  String
+def get_dstInterface(apiKey, fwAddress, virtualRouter, dstAdd):
+    url = "https://" + fwAddress + "/api/"
+    querystring = {"type":"op","cmd": 
     "<test>"
     "<routing>" 
     "<fib-lookup>" 
-    "<virtual-router>" + virtual_router + "</virtual-router>"
-    "<ip>" + dstadd + "</ip>"
+    "<virtual-router>" + virtualRouter + "</virtual-router>"
+    "<ip>" + dstAdd + "</ip>"
     "</fib-lookup>"
-    "</routing>" 
-    "</test>" 
-    ,"key":fw_auth
-    })
-
-    headers = {
-    'cache-control': "no-cache",
+    "</routing>"
+    "</test>","key":apiKey
     }
 
-    resp = requests.request("POST", url, headers=headers, params=querystring, verify=False)
-    root = ET.fromstring(resp.text)
+    headers = {
+    'cache-control':"no-cache",
+    }
+
+    response = requests.request("GET", url, headers=headers, params=querystring, verify=False)
+    root = ET.fromstring(response.text)
     for entry in root.iter('interface'):
         interface_name = entry.text
     return interface_name
 
+# Purpose:  Lookup egress interface from FIB for specific destination
+# Returns:  String
+def get_interfaceZone(apiKey, fwAddress, toInterface):
 
-def get_interface_zone(fw_auth, fw_dnsname, tointerface):
-
-    url = "https://" + fw_dnsname + "/api/"
-    querystring = ({"type":"op","cmd": 
+    url = "https://" + fwAddress + "/api/"
+    querystring = {"type":"op","cmd": 
     "<show>"
-    "<interface>" + tointerface + "</interface>"
-    "</show>" 
-    ,"key":fw_auth
-    })
-    headers = {
-    'cache-control': "no-cache",
+    "<interface>" + toInterface + "</interface>"
+    "</show>","key":apiKey
     }
-    resp = requests.request("POST", url, headers=headers, params=querystring, verify=False)
-    root = ET.fromstring(resp.text)
+    headers = {
+    'cache-control':"no-cache",
+    }
+    response = requests.request("GET", url, headers=headers, params=querystring, verify=False)
+    root = ET.fromstring(response.text)
     for entry in root.iter('zone'):
         interface_zone = entry.text
     return interface_zone
 
+# Purpose:  Returns a list of all IP addresses configured on the firewall
+# Returns:  List
+def list_fwAddresses(apiKey, fwAddress):
 
-def list_firewall_addresses(fw_auth, fw_dnsname):
-
-    url = "https://" + fw_dnsname + "/api/"
-    querystring = ({"type":"op","cmd": 
+    url = "https://" + fwAddress + "/api/"
+    querystring = {"type":"op","cmd": 
     "<show><interface>all</interface></show>"
-    ,"key":fw_auth
-    })
+    ,"key":apiKey
+    }
 
     headers = {
-    'cache-control': "no-cache",
+    'authorization': "Basic " + apiKey,
+    'cache-control':"no-cache",
     }
     fw_addresses = []
-    resp = requests.request("POST", url, headers=headers, params=querystring, verify=False)
-    root = ET.fromstring(resp.text)
+    response = requests.request("GET", url, headers=headers, params=querystring, verify=False)
+    root = ET.fromstring(response.text)
     for entry in root.iter('ip'):
         if re.search(r'([0-9]*\.){3}[0-9]*',entry.text):
             a = re.search(r'[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*',entry.text)
             fw_addresses.append(a[0])
     return fw_addresses
 
-def get_vr_route_table(fw_auth, fw_dnsname, virtual_router):
-#Return unformated route table for specified virtual router. 
-    url = "https://" + fw_dnsname + "/api"
-    querystring = ({"type":"op","cmd": 
-    "<show><routing><route></route></routing></show>"
-    ,"key":fw_auth
-    })
-    headers = {
-    'cache-control': "no-cache",
+# Purpose: Return the route table for specified virtual router.
+# Returns: String
+def get_vr_routeTable(apiKey, fwAddress, virtualRouter):
+    url = "https://" + fwAddress + "/api"
+    querystring = {"type":"op","cmd": 
+    "<show><routing><route></route></routing></show>","key":apiKey
     }
-    response = requests.request("POST", url, headers=headers, params=querystring, verify=False)
+    headers = {
+    'cache-control':"no-cache",
+    }
+    response = requests.request("GET", url, headers=headers, params=querystring, verify=False)
     return response.text
 
-def get_bgp_locrib(fw_auth, fw_dnsname, virtual_router, peer):
-#Return bgp local rib for specified virtual router. 
-    url = "https://" + fw_dnsname + "/api"
-    querystring = ({"type":"op","cmd": 
+
+# Purpose:  Return bgp local rib for specified peer. 
+# Returns:  String
+def get_bgp_locrib(apiKey, fwAddress, virtualRouter, peer):
+
+    url = "https://" + fwAddress + "/api"
+    querystring = {"type":"op","cmd": 
     "<show><routing><protocol><bgp><loc-rib><peer>" + peer + "</peer></loc-rib></bgp></protocol></routing></show>"
-    ,"key":fw_auth
-    })
-    headers = {
-    'cache-control': "no-cache",
+    ,"key":apiKey
     }
-    response = requests.request("POST", url, headers=headers, params=querystring, verify=False)
+    headers = {
+    'cache-control':"no-cache",
+    }
+    response = requests.request("GET", url, headers=headers, params=querystring, verify=False)
     return response.text
 
-def get_bgp_ribout(fw_auth, fw_dnsname, virtual_router, peer):
-#Return bgp rib out for specified virtual router. 
-    url = "https://" + fw_dnsname + "/api"
-    querystring = ({"type":"op","cmd": 
+# Purpose:  Return bgp rib-out for specified peer. 
+# Returns:  String
+def get_bgp_ribout(apiKey, fwAddress, virtualRouter, peer):
+    url = "https://" + fwAddress + "/api"
+    querystring = {"type":"op","cmd": 
     "<show><routing><protocol><bgp><rib-out><peer>" + peer + "</peer></rib-out></bgp></protocol></routing></show>"
-    ,"key":fw_auth
-    })
-    headers = {
-    'cache-control': "no-cache",
+    ,"key":apiKey
     }
-    response = requests.request("POST", url, headers=headers, params=querystring, verify=False)
+    headers = {
+    'cache-control':"no-cache",
+    }
+    response = requests.request("GET", url, headers=headers, params=querystring, verify=False)
     return response.text
