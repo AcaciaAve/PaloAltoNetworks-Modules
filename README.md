@@ -6,14 +6,14 @@ Descriptions of the required parameters for each function are documented within 
 Authentication uses API key generated on each firewall pair.  
 `curl -k -X GET 'https://<firewall>/api/?type=keygen&user=<username>&password=<password>'  `
 
-Import the module into your python script.
+Import the module into your python script.  
 `import pan_modules`  
 
 ## List of modules  
 
 ### test_natRule(apiKey, fwAddress, srcAdd, dstAdd, protocol, dstPort, toZone, toInterface)  
-  Purpose:  Perform "test nat-policy-match" determine NAT rule being used to translate  
-  Returns:  String  
+    Purpose:  Perform "test nat-policy-match" determine NAT rule being used to translate  
+    Returns:  String  
 
 ### get_natRule(apiKey, fwAddress, natRule)  
   Purpose:  Display information of NAT rule, Translated address, interface, type.  
