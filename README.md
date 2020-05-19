@@ -1,6 +1,6 @@
 # PaloAltoNetworks-Modules  
 Palo Alto Networks python modules for common tasks.  
-Descriptions of the required parameters for each function are documented within the python file.  
+Descriptions of the required parameters for each function are documented within `pan_modules.py`
 
 ## Instructions  
 Authentication uses API key generated on each firewall pair.  
